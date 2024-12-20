@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
 #include <exceptions/exceptions.h>
 
 #include "tetris_controller.h"
@@ -26,6 +28,11 @@ public:
   std::shared_ptr<GameField> Field;
 
   bool WasRunCalled = false;
+};
+
+class Game_IO_Mock_GTEST : public Game_IO_I {
+public:
+  MOCK_METHOD
 };
 
 class Game_IO_Mock : public Game_IO_I {
