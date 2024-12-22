@@ -19,12 +19,36 @@ void TetrisController::GameInitFromIO() {
   SetGameModel(std::make_shared<Game>(game_field));
 }
 
-void TetrisController::GameSimulate() {
-  game_model_->Run();
+void TetrisController::GameRun(bool print_all_steps) {
+  if (print_all_steps) GameRunSteps();
+  else GameRunSimple();
 }
 
-void TetrisController::GamePrint() {
+void TetrisController::GameRunSimple() {
+  game_model_->Run();
+  GamePrintField();
+}
+
+void TetrisController::GameRunSteps() {
+  int step = 0;
+  GamePrintStep(step);
+  GamePrintField();
+
+  while (game_model_->IsCanMakeStep() ) {
+    game_model_->MakeStep();
+    GamePrintStep(++step);
+    GamePrintField();
+  }
+}
+
+void TetrisController::GamePrintStep(int step) {
+  auto output_str = "STEP " + std::to_string(step) + '\n';
+  io_->Write(output_str);
+}
+
+void TetrisController::GamePrintField() {
   auto output_str = ParceGameFieldToString( game_model_->GetField() );
+  output_str += '\n';
   io_->Write(output_str);
 }
 

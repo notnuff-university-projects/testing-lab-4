@@ -15,6 +15,8 @@ public:
 
 public:
   virtual void Run();
+  virtual bool IsCanMakeStep();
+  virtual void MakeStep();
   virtual std::shared_ptr<GameField> GetField() const;
 
 protected:

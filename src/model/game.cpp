@@ -19,12 +19,17 @@ Game::Game(const std::shared_ptr<GameField>& init_field) {
 }
 
 void Game::Run() {
-  int deltaX = 0, deltaY = 1;
+  while ( IsCanMakeStep() ) { MakeStep(); }
+}
 
-  while ( IsCanMoveFigure(deltaY, deltaX) ) {
+static constexpr int deltaX = 0, deltaY = 1;
+
+bool Game::IsCanMakeStep() {
+  return IsCanMoveFigure(deltaY, deltaX);
+}
+
+void Game::MakeStep() {
     MoveFigure(deltaY, deltaX);
-  }
-
 }
 
 std::shared_ptr<GameField> Game::GetField() const {

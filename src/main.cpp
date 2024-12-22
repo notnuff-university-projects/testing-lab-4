@@ -18,6 +18,6 @@ int main() {
   controller->SetIOInterface(io_component);
 
   controller->GameInitFromIO();
-  controller->GameSimulate();
-  controller->GamePrint();
+  controller->GameRun();
+  controller->GamePrintField();
 }

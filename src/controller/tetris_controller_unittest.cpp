@@ -9,23 +9,24 @@ using namespace tetris_controller;
 using namespace tetris_model;
 using namespace tetris_view;
 
-// Mock Game model using gmock
 class MockGameModel : public Game {
 public:
     explicit MockGameModel() : Game(CreateGameField({{E}})) {}
 
+
     MOCK_METHOD(void, Run, (), (override));
+    MOCK_METHOD(void, MakeStep, (), (override));
+    MOCK_METHOD(bool, IsCanMakeStep, (), (override));
     MOCK_METHOD(std::shared_ptr<GameField>, GetField, (), (const, override));
+
 };
 
-// Mock IO interface using gmock
 class MockGameIO : public Game_IO_I {
 public:
     MOCK_METHOD(void, Write, (const std::string& text), (override));
     MOCK_METHOD(std::string, Read, (), (override));
 };
 
-// Custom helper function for field comparison (not mocked)
 std::shared_ptr<GameField> CreateExpectedGameField() {
     return CreateGameField({
         {E, E, G, E, E, E},
@@ -36,7 +37,6 @@ std::shared_ptr<GameField> CreateExpectedGameField() {
     });
 }
 
-// Test suite for TetrisController
 class TetrisControllerTest : public ::testing::Test {
 protected:
     std::shared_ptr<MockGameIO> mock_io;
@@ -97,9 +97,12 @@ TEST_F(TetrisControllerTest, ParseCorrectField) {
 }
 
 TEST_F(TetrisControllerTest, ControllerRunsGame) {
+    auto expected_field = CreateExpectedGameField();
+
+    EXPECT_CALL(*mock_game_model, GetField()).WillOnce(::testing::Return(expected_field));
     EXPECT_CALL(*mock_game_model, Run()).Times(1);
 
-    controller.GameSimulate();
+    controller.GameRun(false);
 }
 
 TEST_F(TetrisControllerTest, ControllerCorrectOutputGame) {
@@ -127,8 +130,92 @@ TEST_F(TetrisControllerTest, ControllerCorrectOutputGame) {
     expected_output << "#########" << '\n';
     expected_output << "#########" << '\n';
     expected_output << "#########" << '\n';
+    expected_output << '\n';
 
     EXPECT_CALL(*mock_io, Write(expected_output.str())).Times(1);
 
-    controller.GamePrint();
+    controller.GameRun(false);
+}
+
+TEST_F(TetrisControllerTest, ControllerRunsGameStepByStep) {
+  auto step_0_field = CreateGameField({
+      {E, E, G, E, E, E, E, E},
+      {E, E, G, G, G, E, E, E},
+      {E, E, G, E, E, E, E, E},
+      {E, E, E, E, E, E, E, E},
+      {E, E, E, L, E, E, E, E},
+      {E, E, E, L, E, E, L, E},
+      {L, L, L, L, L, L, L, E},
+  });
+
+  auto step_1_field = CreateGameField({
+        {E, E, E, E, E, E, E, E},
+        {E, E, G, E, E, E, E, E},
+        {E, E, G, G, G, E, E, E},
+        {E, E, G, E, E, E, E, E},
+        {E, E, E, L, E, E, E, E},
+        {E, E, E, L, E, E, L, E},
+        {L, L, L, L, L, L, L, E},
+  });
+
+  auto step_2_field = CreateGameField({
+        {E, E, E, E, E, E, E, E},
+        {E, E, E, E, E, E, E, E},
+        {E, E, G, E, E, E, E, E},
+        {E, E, G, G, G, E, E, E},
+        {E, E, G, L, E, E, E, E},
+        {E, E, E, L, E, E, L, E},
+        {L, L, L, L, L, L, L, E},
+  });
+
+  EXPECT_CALL(*mock_game_model, IsCanMakeStep())
+      .WillOnce(::testing::Return(true))
+      .WillOnce(::testing::Return(true))
+      .WillOnce(::testing::Return(false));
+
+  EXPECT_CALL(*mock_game_model, MakeStep()).Times(2);
+
+  EXPECT_CALL(*mock_game_model, GetField())
+      .WillOnce(::testing::Return(step_0_field))
+      .WillOnce(::testing::Return(step_1_field))
+      .WillOnce(::testing::Return(step_2_field));
+
+  EXPECT_CALL(*mock_io, Write("STEP 0\n"));
+
+  std::stringstream step_0_output;
+  step_0_output << "..p....." << '\n';
+  step_0_output << "..ppp..." << '\n';
+  step_0_output << "..p....." << '\n';
+  step_0_output << "........" << '\n';
+  step_0_output << "...#...." << '\n';
+  step_0_output << "...#..#." << '\n';
+  step_0_output << "#######." << '\n';
+  step_0_output << '\n';
+  EXPECT_CALL(*mock_io, Write(step_0_output.str()));
+
+  EXPECT_CALL(*mock_io, Write("STEP 1\n"));
+  std::stringstream step_1_output;
+  step_1_output << "........" << '\n';
+  step_1_output << "..p....." << '\n';
+  step_1_output << "..ppp..." << '\n';
+  step_1_output << "..p....." << '\n';
+  step_1_output << "...#...." << '\n';
+  step_1_output << "...#..#." << '\n';
+  step_1_output << "#######." << '\n';
+  step_1_output << '\n';
+  EXPECT_CALL(*mock_io, Write(step_1_output.str()));
+
+  EXPECT_CALL(*mock_io, Write("STEP 2\n"));
+  std::stringstream step_2_output;
+  step_2_output << "........" << '\n';
+  step_2_output << "........" << '\n';
+  step_2_output << "..p....." << '\n';
+  step_2_output << "..ppp..." << '\n';
+  step_2_output << "..p#...." << '\n';
+  step_2_output << "...#..#." << '\n';
+  step_2_output << "#######." << '\n';
+  step_2_output << '\n';
+  EXPECT_CALL(*mock_io, Write(step_2_output.str()));
+
+  controller.GameRun(true);
 }

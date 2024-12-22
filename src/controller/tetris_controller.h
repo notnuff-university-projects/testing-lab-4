@@ -24,8 +24,14 @@ public:
 
 public:
   void GameInitFromIO();
-  void GameSimulate();
-  void GamePrint();
+  void GameRun(bool print_all_steps = false);
+
+protected:
+  void GameRunSimple();
+  void GameRunSteps();
+
+  void GamePrintStep(int step);
+  void GamePrintField();
 
 protected:
   std::shared_ptr<GameField> ParceStringToGameField(const std::string& input_str);
