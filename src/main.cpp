@@ -19,5 +19,4 @@ int main() {
 
   controller->GameInitFromIO();
   controller->GameRun();
-  controller->GamePrintField();
 }
