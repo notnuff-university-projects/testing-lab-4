@@ -2,179 +2,133 @@
 #include <gmock/gmock.h>
 
 #include <exceptions/exceptions.h>
-
 #include "tetris_controller.h"
+#include "game_field_common.h"
 
 using namespace tetris_controller;
 using namespace tetris_model;
 using namespace tetris_view;
 
-#include "game_field_common.h"
-
-auto minimal_gf = CreateGameField({{E}});
-class GameModel_Mock : public Game {
+// Mock Game model using gmock
+class MockGameModel : public Game {
 public:
-  explicit GameModel_Mock() : Game(minimal_gf) {}
+    explicit MockGameModel() : Game(CreateGameField({{E}})) {}
 
-  virtual void Run() override {
-    WasRunCalled = true;
-  }
-
-  virtual std::shared_ptr<GameField> GetField() const override {
-    return Field;
-  }
-
-public:
-  std::shared_ptr<GameField> Field;
-
-  bool WasRunCalled = false;
+    MOCK_METHOD(void, Run, (), (override));
+    MOCK_METHOD(std::shared_ptr<GameField>, GetField, (), (const, override));
 };
 
-class Game_IO_Mock_GTEST : public Game_IO_I {
+// Mock IO interface using gmock
+class MockGameIO : public Game_IO_I {
 public:
-  MOCK_METHOD
+    MOCK_METHOD(void, Write, (const std::string& text), (override));
+    MOCK_METHOD(std::string, Read, (), (override));
 };
 
-class Game_IO_Mock : public Game_IO_I {
-public:
-  virtual void Write(const std::string& text) override {
-    WrittenOutput = text;
-  }
+// Custom helper function for field comparison (not mocked)
+std::shared_ptr<GameField> CreateExpectedGameField() {
+    return CreateGameField({
+        {E, E, G, E, E, E},
+        {L, L, G, E, L, L},
+        {L, L, G, G, L, L},
+        {L, L, E, E, L, L},
+        {L, L, E, E, L, L},
+    });
+}
 
-  virtual std::string Read() override {
-    return ReturnInput;
-  }
+// Test suite for TetrisController
+class TetrisControllerTest : public ::testing::Test {
+protected:
+    std::shared_ptr<MockGameIO> mock_io;
+    std::shared_ptr<MockGameModel> mock_game_model;
+    TetrisController controller;
 
-public:
-  std::string ReturnInput;
-  std::string WrittenOutput;
+    void SetUp() override {
+        mock_io = std::make_shared<MockGameIO>();
+        mock_game_model = std::make_shared<MockGameModel>();
+        controller.SetIOInterface(mock_io);
+        controller.SetGameModel(mock_game_model);
+    }
 };
 
-class TetrisControllerTest : public TetrisController {
-public:
-  std::shared_ptr<GameField> GetGameField() {
-    return game_model_->GetField();
-  };
-};
+TEST_F(TetrisControllerTest, ParseEmptyFail) {
+    EXPECT_CALL(*mock_io, Read()).WillOnce(::testing::Return(""));
 
-TEST(TetrisController, ParseEmptyFail) {
-  auto io = std::make_shared<Game_IO_Mock>();
-  TetrisController controller;
-  controller.SetIOInterface(io);
-
-  io->ReturnInput = "";
-
-  EXPECT_THROW(controller.GameInitFromIO(), parse_error);
-
+    EXPECT_THROW(controller.GameInitFromIO(), parse_error);
 }
 
-TEST(TetrisController, ParseUnknownCharacterFail) {
-  auto io = std::make_shared<Game_IO_Mock>();
+TEST_F(TetrisControllerTest, ParseUnknownCharacterFail) {
+    EXPECT_CALL(*mock_io, Read()).WillOnce(::testing::Return("1 1\nu"));
 
-  TetrisController controller;
-  controller.SetIOInterface(io);
-
-  io->ReturnInput = "1 1\nu";
-
-  EXPECT_THROW(controller.GameInitFromIO(), parse_error);
+    EXPECT_THROW(controller.GameInitFromIO(), parse_error);
 }
 
-TEST(TetrisController, ParseNoDimensionsFail) {
-  auto io = std::make_shared<Game_IO_Mock>();
+TEST_F(TetrisControllerTest, ParseNoDimensionsFail) {
+    EXPECT_CALL(*mock_io, Read()).WillOnce(::testing::Return("x x\n#"));
 
-  TetrisController controller;
-  controller.SetIOInterface(io);
-
-  io->ReturnInput = "x x\n#";
-
-  EXPECT_THROW(controller.GameInitFromIO(), parse_error);
+    EXPECT_THROW(controller.GameInitFromIO(), parse_error);
 }
 
-TEST(TetrisController, ParseWrongDimensionsFail) {
-  auto io = std::make_shared<Game_IO_Mock>();
+TEST_F(TetrisControllerTest, ParseWrongDimensionsFail) {
+    EXPECT_CALL(*mock_io, Read()).WillOnce(::testing::Return("3 3\n#\n#\n"));
 
-  TetrisController controller;
-  controller.SetIOInterface(io);
-
-  io->ReturnInput = "3 3\n#\n#\n";
-
-  EXPECT_THROW(controller.GameInitFromIO(), parse_error);
+    EXPECT_THROW(controller.GameInitFromIO(), parse_error);
 }
 
-TEST(TetrisController, ParceCorrectField) {
-  auto io = std::make_shared<Game_IO_Mock>();
+TEST_F(TetrisControllerTest, ParseCorrectField) {
+    std::stringstream ss;
+    ss << "5 6" << '\n';
+    ss << "..p..." << '\n';
+    ss << "##p.##" << '\n';
+    ss << "##pp##" << '\n';
+    ss << "##..##" << '\n';
+    ss << "##..##" << '\n';
 
-  TetrisControllerTest controller;
-  controller.SetIOInterface(io);
+    EXPECT_CALL(*mock_io, Read()).WillOnce(::testing::Return(ss.str()));
 
-  std::stringstream ss;
-  ss << "5 6" << '\n';
-  ss << "..p..." << '\n';
-  ss << "##p.##" << '\n';
-  ss << "##pp##" << '\n';
-  ss << "##..##" << '\n';
-  ss << "##..##" << '\n';
+    EXPECT_CALL(*mock_game_model, GetField()).WillOnce(::testing::Return(CreateExpectedGameField()));
 
-  io->ReturnInput = ss.str();
+    controller.GameInitFromIO();
 
-  controller.GameInitFromIO();
-  auto gf = controller.GetGameField();
-  auto expected_field = CreateGameField({
-    {E, E, G, E, E, E},
-    {L, L, G, E, L, L},
-    {L, L, G, G, L, L},
-    {L, L, E, E, L, L},
-    {L, L, E, E, L, L},
-  });
+    auto game_field = mock_game_model->GetField();
+    auto expected_field = CreateExpectedGameField();
 
-  EXPECT_TRUE(AreFieldsEqual(gf, expected_field));
+    EXPECT_TRUE(AreFieldsEqual(game_field, expected_field));
 }
 
+TEST_F(TetrisControllerTest, ControllerRunsGame) {
+    EXPECT_CALL(*mock_game_model, Run()).Times(1);
 
-TEST(TetrisController, ControllerRunsGame) {
-  auto io = std::make_shared<Game_IO_Mock>();
-  auto gm = std::make_shared<GameModel_Mock>();
-
-  TetrisController controller;
-  controller.SetIOInterface(io);
-  controller.SetGameModel(gm);
-
-  controller.GameSimulate();
-
-  EXPECT_TRUE(gm->WasRunCalled);
+    controller.GameSimulate();
 }
 
-TEST(TetrisController, ControllerCorrectOutputGame) {
-  auto io = std::make_shared<Game_IO_Mock>();
-  auto gm = std::make_shared<GameModel_Mock>();
+TEST_F(TetrisControllerTest, ControllerCorrectOutputGame) {
+    auto field = CreateGameField({
+        {E, E, E, G, G, G, E, E, E},
+        {E, E, E, G, G, G, E, E, E},
+        {E, E, E, G, G, G, E, E, E},
+        {E, E, E, L, L, L, E, E, E},
+        {E, E, E, L, L, L, E, E, E},
+        {E, E, E, L, L, L, E, E, E},
+        {L, L, L, L, L, L, L, L, L},
+        {L, L, L, L, L, L, L, L, L},
+        {L, L, L, L, L, L, L, L, L},
+    });
 
-  TetrisController controller;
-  controller.SetIOInterface(io);
-  controller.SetGameModel(gm);
+    EXPECT_CALL(*mock_game_model, GetField()).WillOnce(::testing::Return(field));
 
-  gm->Field = CreateGameField({
-    {E, E, E, G, G, G, E, E, E},
-    {E, E, E, G, G, G, E, E, E},
-    {E, E, E, G, G, G, E, E, E},
-    {E, E, E, L, L, L, E, E, E},
-    {E, E, E, L, L, L, E, E, E},
-    {E, E, E, L, L, L, E, E, E},
-    {L, L, L, L, L, L, L, L, L},
-    {L, L, L, L, L, L, L, L, L},
-    {L, L, L, L, L, L, L, L, L},
-  });
-  controller.GamePrint();
+    std::stringstream expected_output;
+    expected_output << "...ppp..." << '\n';
+    expected_output << "...ppp..." << '\n';
+    expected_output << "...ppp..." << '\n';
+    expected_output << "...###..." << '\n';
+    expected_output << "...###..." << '\n';
+    expected_output << "...###..." << '\n';
+    expected_output << "#########" << '\n';
+    expected_output << "#########" << '\n';
+    expected_output << "#########" << '\n';
 
-  std::stringstream ss;
-  ss << "...ppp..." << '\n';
-  ss << "...ppp..." << '\n';
-  ss << "...ppp..." << '\n';
-  ss << "...###..." << '\n';
-  ss << "...###..." << '\n';
-  ss << "...###..." << '\n';
-  ss << "#########" << '\n';
-  ss << "#########" << '\n';
-  ss << "#########" << '\n';
+    EXPECT_CALL(*mock_io, Write(expected_output.str())).Times(1);
 
-  EXPECT_EQ(io->WrittenOutput, ss.str());
+    controller.GamePrint();
 }

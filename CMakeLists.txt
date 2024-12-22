@@ -40,7 +40,7 @@ add_executable(lab4 src/main.cpp ${COMPILATION_UNITS} ${HEADERS})
 target_link_libraries(lab4 PRIVATE matrices)
 target_include_directories(lab4 PRIVATE common)
 
-set(GTESTLIBS GTest::gtest_main GTest::GTest GTest::Main)
+set(GTESTLIBS GTest::gtest_main GTest::GTest GTest::Main GTest::gmock_main)
 find_package(GTest REQUIRED)
 
 enable_testing()
